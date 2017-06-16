@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { ReplaySubject, BehaviorSubject, Observable } from 'rxjs/Rx';
+import { ReplaySubject, BehaviorSubject, Observable, Subject } from 'rxjs/Rx';
 import { FormsResourceService } from '../../openmrs-api/forms-resource.service';
 import { LocalStorageService } from '../../utils/local-storage.service';
 import { FormSchemaCompiler } from 'ng2-openmrs-formentry';
@@ -125,6 +125,7 @@ export class FormSchemaService {
   }
 
   private fetchFormSchemaReferences(formSchema: any): Observable<any> {
+    // first create the observableBatch/ArrayOfRequests
     let observableBatch: Array<Observable<any>> = [];
     let referencedForms: Array<any> = formSchema.referencedForms;
     if (Array.isArray(referencedForms) && referencedForms.length > 0) {
@@ -135,37 +136,58 @@ export class FormSchemaService {
         );
       });
     }
-    return Observable.forkJoin(observableBatch);
+
+    // now get schemaReferences for each observableBatch/ArrayOfRequests
+    let schemaReferences: any = [];
+    return Observable.create((observer: Subject<any>) => {
+      return Observable.concat(observableBatch).subscribe(
+        (response: any) => {
+          schemaReferences.push(response);
+          console.log('NEXT FETCH,', response);
+        },
+        err => {
+          observer.error(err);
+          console.log('ERROR');
+        }, () => {
+          // when all requests have been processed return schemaReferences
+          observer.next(schemaReferences);
+          console.log('COMPLETE');
+        }
+      );
+
+    }).first();
+
   }
 
   private fetchFormSchemaUsingFormMetadata(formUuid: string): Observable<any> {
-    let formSchema: ReplaySubject<any> = new ReplaySubject(1);
-    this.formsResourceService.getFormMetaDataByUuid(formUuid)
-      .subscribe(
-        (formMetadataObject: any) => {
-          if (formMetadataObject.resources.length > 0) {
-            this.formsResourceService
-              .getFormClobDataByUuid(formMetadataObject.resources[0].valueReference)
-              .subscribe(
-                (clobData: any) => {
-                  formSchema.next(clobData);
-                  formSchema.complete();
-                },
-                err => {
-                  console.error(err);
-                  formSchema.error(err);
-                });
-          } else {
-            formSchema.error(formMetadataObject.display +
-              ':This formMetadataObject has no resource');
-          }
+    return Observable.create((observer: Subject<any>) => {
+      return this.formsResourceService.getFormMetaDataByUuid(formUuid)
+        .subscribe(
+          (formMetadataObject: any) => {
+            if (formMetadataObject.resources.length > 0) {
+              this.formsResourceService
+                .getFormClobDataByUuid(formMetadataObject.resources[0].valueReference)
+                .subscribe(
+                  (clobData: any) => {
+                    observer.next(clobData);
+                   // observer.complete();
+                  },
+                  err => {
+                    console.error(err);
+                    observer.error(err);
+                  });
+            } else {
+              observer.error(formMetadataObject.display +
+                ':This formMetadataObject has no resource');
+            }
 
-        },
-        err => {
-          console.error(err);
-          formSchema.error(err);
-        });
-    return formSchema;
+          },
+          err => {
+            console.error(err);
+            observer.error(err);
+          });
+
+    }).first();
   }
 
   private getFormUuidArray(formSchemaReferences: Array<Object>) {
