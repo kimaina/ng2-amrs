@@ -15,6 +15,9 @@ import { DataListsModule } from '../../data-lists/data-lists.module';
 import {
     HivSummaryIndicatorsPatientListComponent
 } from '../../hiv-care-lib/hiv-summary-indicators/patient-list.component';
+import {
+    PatientsRequiringVLComponent
+ } from './patients-requiring-vl/patients-requiring-vl.component';
 
 @NgModule({
     imports: [
@@ -26,11 +29,13 @@ import {
         CommonModule
     ],
     exports: [HivSummaryIndicatorComponent,
-        HivSummaryIndicatorsPatientListComponent],
+        HivSummaryIndicatorsPatientListComponent,
+        PatientsRequiringVLComponent],
     declarations: [
         Moh731ReportComponent,
         HivSummaryIndicatorComponent,
-        HivSummaryIndicatorsPatientListComponent],
+        HivSummaryIndicatorsPatientListComponent,
+        PatientsRequiringVLComponent],
     providers: [],
 })
 export class HivProgramModule { }
